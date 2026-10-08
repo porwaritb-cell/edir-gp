@@ -126,6 +126,9 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 
+// model.html lives in the 'model + vertex' folder, so no file has to be moved
+const MODEL_PAGE = './model%20+%20vertex/model.html';
+
 // EDIT ME
 const CONFIG = {
   plateTitle: 'PROFILE',
@@ -143,11 +146,33 @@ const CONFIG = {
     knot: { title: 'ผลงานที่ 3', desc: 'Cel shading', tools: 'Blender · Cel shading', link: '' }
   },
   wallBoards: [
-    { side: 'left',  kicker: 'PORTFOLIO', title: 'ผลงานของฉัน', subtitle: 'Selected works', desc: 'อธิบายภาพรวมผลงานของคุณตรงนี้', list: ['ผลงาน 1 — คำอธิบายสั้น ๆ', 'ผลงาน 2 — คำอธิบายสั้น ๆ', 'ผลงาน 3 — คำอธิบายสั้น ๆ'], tags: 'Three.js · Blender', image: '', link: '' },
-    { side: 'right', kicker: 'PORTFOLIO', title: 'ทักษะและติดต่อ', subtitle: 'Skills & contact', desc: 'เขียนทักษะ ประสบการณ์ และช่องทางติดต่อตรงนี้', list: ['ทักษะ 1', 'ทักษะ 2', 'อีเมล / โซเชียล'], tags: '', image: '', link: '' }
+    { side: 'left',  kicker: 'PORTFOLIO', title: 'ผลงานของฉัน', subtitle: 'Selected works', desc: 'ผลงานที่ภูมิใจนำเสนอ',
+      list: [
+        '1 · PBR — วัสดุสมจริงด้วย Three.js',
+        '2 · Vertex Shader — เอฟเฟกต์ GLSL',
+        '3 · Cel Shading — สไตล์การ์ตูนใน Blender',
+        ['4 · Model Inspector — นับเส้นและจุดของไฟล์ .glb ↗', MODEL_PAGE],
+        
+        '5 · ซากุระ — เกาะและกลีบดอกไม้ 3D (พอร์ตโฟลิโอนี้)'
+      ],
+      tags: 'Three.js · Blender · GLSL', image: '', link: MODEL_PAGE, linkText: 'Open Project 4 ↗' },
+    { side: 'right', kicker: 'PORTFOLIO', title: 'ทักษะและติดต่อ', subtitle: 'Skills & contact', desc: 'วิทยาการคอมพิวเตอร์ · มหาวิทยาลัยเกษตรศาสตร์',
+      list: [
+        'ทักษะ: Three.js · Blender · GLSL · HTML/CSS/JS',
+        'การศึกษา: วิทยาการคอมพิวเตอร์ ม.เกษตรศาสตร์',
+        'ภาษา: ไทย · English',
+        ['อีเมล: porwarit@ku.th', 'mailto:porwarit@ku.th'],
+        ['GitHub: porwaritb-cell', 'https://github.com/porwaritb-cell%20780645'],
+        'เครื่องมือ: VS Code · Git · GitHub',
+        'เก่งโค้ด: เขียนโปรแกรมแก้ปัญหาอย่างเป็นระบบ'
+      ],
+      tags: '', image: '', link: 'https://github.com/porwaritb-cell%20780645', linkText: 'Open GitHub ↗' }
   ],
-  slots: [ { title: '', desc: '', tools: '', link: '', model: '', size: 0.9 } ],
-  model: './glb/ส่งจริง.glb',
+  slots: [ { title: 'Model Inspector', desc: 'นับเส้น จุด และสามเหลี่ยมของไฟล์ .glb — คลิกเพื่อเปิด', tools: 'Three.js · glTF', link: MODEL_PAGE, model: '', size: 0.9, crystal: 'gold' },
+          { title: 'Green Crystal', desc: 'คริสตัลสีเขียวหกเหลี่ยม', tools: 'Three.js · PBR', link: '', model: '', size: 0.9, crystal: 'green' } ],
+  // ส่งจริง.glb sits next to index.html (not inside /glb). Fallbacks are tried in order.
+  model: './ส่งจริง.glb',
+  modelFallbacks: ['./glb/ส่งจริง.glb'],
   photo: './profile.jpg'
 };
 
@@ -191,7 +216,7 @@ const SKY = {
 };
 
 // any missing sound file falls back to a synthesized tone
-const ver = '?v=2';
+const ver = '?v=' + Date.now(); // cache-buster so the browser never serves an old sound/model
 const SOUNDS = {
   ambient: './sounds/ambient.mp3' + ver,
   zoom:    './sounds/zoom.mp3' + ver,
@@ -1277,9 +1302,26 @@ async function buildText(topY) {
 
     const arm = new THREE.Group();
     holder.add(arm);
-    slotSpin.push(arm);
+    if (!slot.crystal) slotSpin.push(arm); // the crystal stays turned 90 degrees
 
+    const crystal = () => {
+      // hexagonal crystal (gold or green), about the size of a Rubik's cube, turned 90 degrees
+      const h = .56, r = .27;
+      const tone = slot.crystal === 'green' ? { c: 0x2fd37a, m: .35, e: 0x0a7a3c } : { c: 0xffc933, m: .75, e: 0xb8860b };
+      const geo = new THREE.LatheGeometry([
+        new THREE.Vector2(0, 0), new THREE.Vector2(r, h * .2), new THREE.Vector2(r, h * .7), new THREE.Vector2(0, h)
+      ], 6);
+      geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({
+        color: tone.c, metalness: tone.m, roughness: .12, clearcoat: 1, clearcoatRoughness: .05,
+        emissive: tone.e, emissiveIntensity: .35, flatShading: true, envMapIntensity: 1.6
+      }));
+      m.rotation.y = Math.PI / 2;
+      m.castShadow = true;
+      arm.add(m);
+    };
     const token = () => {
+      if (slot.crystal) return crystal();
       const m = new THREE.Mesh(new THREE.OctahedronGeometry(.3), new THREE.MeshStandardMaterial({ color: 0xc9a24b, metalness: .8, roughness: .25 }));
       m.position.y = .45;
       m.castShadow = true;
@@ -1574,7 +1616,14 @@ function openBoard(b) {
   ul.replaceChildren();
   (b.list || []).forEach(t => {
     const li = document.createElement('li');
-    li.textContent = t;
+    if (Array.isArray(t)) { // [text, url] becomes a link
+      const a = document.createElement('a');
+      a.textContent = t[0];
+      a.href = t[1];
+      a.style.color = '#ffc2d9';
+      if (!t[1].startsWith('mailto:')) { a.target = '_blank'; a.rel = 'noopener'; }
+      li.appendChild(a);
+    } else li.textContent = t;
     ul.appendChild(li);
   });
 
@@ -1593,6 +1642,7 @@ function openBoard(b) {
   const a = $('bd-a');
   a.hidden = !b.link;
   if (b.link) a.href = b.link;
+  a.textContent = b.linkText || 'Open ↗';
 
   bd.hidden = false;
   requestAnimationFrame(() => requestAnimationFrame(() => bd.classList.add('show')));
@@ -1959,13 +2009,24 @@ enterBtn.onclick = () => {
 async function start() {
   let gltf;
   try {
-    gltf = await new GLTFLoader().loadAsync(CONFIG.model, e => {
-      if (e.lengthComputable) bump(e.loaded / e.total * 80);
-    });
+    let lastErr;
+    for (const path of [CONFIG.model, ...(CONFIG.modelFallbacks || [])]) {
+      try {
+        gltf = await new GLTFLoader().loadAsync(path + '?v=' + Date.now(), e => {
+          if (e.lengthComputable) bump(e.loaded / e.total * 80);
+        });
+        console.info('Loaded model from', path);
+        break;
+      } catch (err) { lastErr = err; console.warn('Model not at', path, err); }
+    }
+    if (!gltf) throw lastErr;
   } catch (err) {
     console.error('Could not load model:', err);
     clearInterval(pctTick);
-    document.querySelector('#loader .jp').textContent = 'モデルを読み込めません · check CONFIG.model';
+    const onFile = location.protocol === 'file:';
+    document.querySelector('#loader .jp').textContent = onFile
+      ? 'เปิดผ่าน Live Server / http://localhost เท่านั้น (file:// โหลด .glb ไม่ได้)'
+      : 'モデルを読み込めません · check CONFIG.model';
     return;
   }
   bump(85);
