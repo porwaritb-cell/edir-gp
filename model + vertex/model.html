@@ -1,0 +1,251 @@
+<html>
+<head>
+<title>Model Inspector</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #14161c; color: #e9e6ef; font: 13px system-ui, sans-serif; }
+  canvas { display: block; }
+  #panel { position: fixed; top: 12px; left: 12px; bottom: 12px; width: 340px; padding: 14px; box-sizing: border-box;
+           display: flex; flex-direction: column; gap: 10px;
+           background: rgba(24, 27, 36, .82); border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; }
+  h1 { margin: 0; font-size: 15px; }
+  select, button { font: inherit; color: inherit; background: #262a38; border: 1px solid rgba(255, 255, 255, .16); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  button.on { background: #ffcf6e; color: #1b1b22; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  #totals { color: #9fd3ff; }
+  #list { flex: 1; overflow: auto; border-top: 1px solid rgba(255, 255, 255, .1); }
+  .item { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 4px 6px; cursor: pointer; }
+  .item:hover { background: rgba(255, 255, 255, .07); }
+  .item.sel { background: rgba(255, 207, 110, .22); }
+  details p { margin: 6px 0 0; color: #cfcbdb; }
+  summary { cursor: pointer; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+
+<div id="panel">
+  <h1>Model Inspector</h1>
+  <select id="fileSelect"></select>
+  <div class="row" id="modes"></div>
+  <div id="totals">loading...</div>
+  <div id="list"></div>
+  <details>
+    <summary>Reading the numbers</summary>
+    <p><b>Vertices</b> are the corner points of the mesh. <b>Triangles</b> are the faces after triangulation, so one quad counts as 2 triangles.
+       Click a row (or click the model) to isolate that part, click it again to show everything.</p>
+  </details>
+  <details>
+    <summary>About this model</summary>
+    <p id="about"></p>
+  </details>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const aboutText = 'The island was generated with a Python script running inside Blender (boxes, cylinders, icospheres and hand-computed roof meshes). ' +
+  'It was not sculpted vertex by vertex by hand. The concept image came from Gemini, and the script and this page were written with help from Claude (Anthropic). ' +
+  'Write here what you chose, placed and configured yourself.';
+
+const files = [
+  ['The whole model', '../glb/ส่งจริง.glb'],
+  ['House', '../glb/house.glb'],
+  ['Garden', '../glb/garden.glb'],
+  ['Trees', '../glb/trees.glb'],
+  ['Terrain', '../glb/terrain.glb'],
+  ['Mountains', '../glb/mountains.glb']
+];
+const modeNames = ['Solid', 'Wireframe', 'Edges', 'Vertices', 'Wire + vertices'];
+
+const fileSelect = document.getElementById('fileSelect');
+const modeBox = document.getElementById('modes');
+const totals = document.getElementById('totals');
+const list = document.getElementById('list');
+document.getElementById('about').textContent = aboutText;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14161c);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445066, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(8, 14, 10);
+scene.add(sun);
+
+const wireMat = new THREE.MeshBasicMaterial({ color: 0x8fd3ff, wireframe: true });
+const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+const dotMat = new THREE.PointsMaterial({ color: 0xffcf6e, size: 3, sizeAttenuation: false });
+
+let model = null;
+let mode = 0;
+let sel = null;
+let parts = [];
+let downX = 0, downY = 0;
+
+function baseName(name) {
+  return name.replace(/[._]?\d+(_\d+)?$/, ''); // "Blossom12_3" -> "Blossom"
+}
+
+function colorOf(name) {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return new THREE.Color().setHSL(h / 360, 0.45, 0.62);
+}
+
+function count(mesh) {
+  const verts = mesh.geometry.attributes.position.count;
+  const idx = mesh.geometry.index;
+  const tris = idx ? idx.count / 3 : verts / 3;
+  return { verts, tris };
+}
+
+function buildParts(root) {
+  parts = [];
+  const meshes = [];
+  root.traverse(o => { if (o.isMesh) meshes.push(o); }); // collect first: adding children while traversing would recurse forever
+  for (const mesh of meshes) {
+    const base = baseName(mesh.name);
+    mesh.material = new THREE.MeshStandardMaterial({ color: colorOf(base), roughness: 0.8, flatShading: true });
+    const wire = new THREE.Mesh(mesh.geometry, wireMat);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 25), edgeMat); // 25 degree threshold
+    const dots = new THREE.Points(mesh.geometry, dotMat);
+    mesh.add(wire, edges, dots);
+    parts.push({ mesh, base, wire, edges, dots });
+  }
+}
+
+function buildList() {
+  const groups = new Map();
+  for (const p of parts) {
+    const c = count(p.mesh);
+    const g = groups.get(p.base) || { base: p.base, objs: 0, verts: 0, tris: 0 };
+    g.objs++; g.verts += c.verts; g.tris += c.tris;
+    groups.set(p.base, g);
+  }
+
+  const rows = [...groups.values()].sort((a, b) => b.verts - a.verts);
+  const o = rows.reduce((s, g) => s + g.objs, 0);
+  const v = rows.reduce((s, g) => s + g.verts, 0);
+  const t = rows.reduce((s, g) => s + g.tris, 0);
+  totals.textContent = `${o.toLocaleString()} objects | ${v.toLocaleString()} vertices | ${t.toLocaleString()} triangles`;
+
+  list.innerHTML = '';
+  for (const g of rows) {
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.dataset.base = g.base;
+    item.innerHTML = `<span>${g.base}${g.objs > 1 ? ' x' + g.objs : ''}</span><span>${g.verts.toLocaleString()} v</span><span>${g.tris.toLocaleString()} t</span>`;
+    item.onclick = () => select(sel === g.base ? null : g.base);
+    list.appendChild(item);
+  }
+}
+
+function applyView() {
+  for (const p of parts) {
+    p.mesh.visible = (sel === null || p.base === sel);
+    p.mesh.material.visible = (mode === 0);
+    p.wire.visible = (mode === 1 || mode === 4);
+    p.edges.visible = (mode === 2);
+    p.dots.visible = (mode === 3 || mode === 4);
+  }
+  for (const el of list.children) el.classList.toggle('sel', el.dataset.base === sel);
+  [...modeBox.children].forEach((b, i) => b.classList.toggle('on', i === mode));
+}
+
+function select(base) {
+  sel = base;
+  applyView();
+}
+
+function frameModel() {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(size.x, size.y, size.z);
+  controls.target.copy(center);
+  camera.position.copy(center).add(new THREE.Vector3(0.9, 0.7, 1.2).normalize().multiplyScalar(radius * 1.4));
+  camera.near = radius / 500;
+  camera.far = radius * 20;
+  camera.updateProjectionMatrix();
+}
+
+async function load(url) {
+  totals.textContent = 'loading...';
+  if (model) scene.remove(model);
+  sel = null;
+  model = null;
+
+  try {
+    const gltf = await new GLTFLoader().loadAsync(url);
+    const backdrop = gltf.scene.getObjectByName('Backdrop');
+    if (backdrop) backdrop.parent.remove(backdrop); // sky sphere, not part of the model
+    model = gltf.scene;
+    scene.add(model);
+    buildParts(model);
+    buildList();
+    applyView();
+    frameModel();
+  } catch (err) {
+    totals.textContent = 'could not load ' + url;
+    console.error(err);
+  }
+}
+
+files.forEach(([label, url]) => fileSelect.add(new Option(label, url)));
+modeNames.forEach((label, i) => {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.onclick = () => { mode = i; applyView(); };
+  modeBox.appendChild(b);
+});
+fileSelect.onchange = () => load(fileSelect.value);
+
+const ray = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  downX = event.clientX;
+  downY = event.clientY;
+});
+
+renderer.domElement.addEventListener('click', (event) => {
+  if (Math.hypot(event.clientX - downX, event.clientY - downY) > 5) return; // was a drag, not a click
+  pointer.set((event.clientX / innerWidth) * 2 - 1, -(event.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(pointer, camera);
+  const hit = ray.intersectObjects(parts.filter(p => p.mesh.visible).map(p => p.mesh), false)[0];
+  if (hit) {
+    const base = baseName(hit.object.name);
+    select(sel === base ? null : base);
+  }
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+function animate() {
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+
+load(files[0][1]);
+
+</script>
+</body>
+</html>

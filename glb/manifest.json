@@ -1,0 +1,37 @@
+{
+  "trees": {
+    "file": "models/trees.glb",
+    "objects": 512,
+    "vertices": 45132,
+    "triangles": 88216,
+    "bytes": 1421032
+  },
+  "garden": {
+    "file": "models/garden.glb",
+    "objects": 75,
+    "vertices": 3926,
+    "triangles": 5682,
+    "bytes": 151468
+  },
+  "mountains": {
+    "file": "models/mountains.glb",
+    "objects": 4,
+    "vertices": 4612,
+    "triangles": 9208,
+    "bytes": 169120
+  },
+  "terrain": {
+    "file": "models/terrain.glb",
+    "objects": 11,
+    "vertices": 3425,
+    "triangles": 3156,
+    "bytes": 107696
+  },
+  "house": {
+    "file": "models/house.glb",
+    "objects": 21,
+    "vertices": 14334,
+    "triangles": 7362,
+    "bytes": 403136
+  }
+}
