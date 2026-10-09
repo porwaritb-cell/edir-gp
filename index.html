@@ -152,21 +152,21 @@ const CONFIG = {
         '2 · Vertex Shader — เอฟเฟกต์ GLSL',
         '3 · Cel Shading — สไตล์การ์ตูนใน Blender',
         ['4 · Model Inspector — นับเส้นและจุดของไฟล์ .glb ↗', MODEL_PAGE],
-        
-        '5 · ซากุระ — เกาะและกลีบดอกไม้ 3D (พอร์ตโฟลิโอนี้)'
+        '5 · Green Crystal — คริสตัลสีเขียว (แท่น Project 5)',
+        '6 · ซากุระ — เกาะและกลีบดอกไม้ 3D (พอร์ตโฟลิโอนี้)'
       ],
       tags: 'Three.js · Blender · GLSL', image: '', link: MODEL_PAGE, linkText: 'Open Project 4 ↗' },
-    { side: 'right', kicker: 'PORTFOLIO', title: 'ทักษะและติดต่อ', subtitle: 'Skills & contact', desc: 'วิทยาการคอมพิวเตอร์ · มหาวิทยาลัยเกษตรศาสตร์',
+    { side: 'right', kicker: 'SKILLS & CONTACT', title: 'ทักษะและติดต่อ', subtitle: 'Skills & contact',
+      desc: 'นักศึกษาวิทยาการคอมพิวเตอร์ ม.เกษตรศาสตร์ สนใจงานกราฟิก 3D และพัฒนาเว็บ พร้อมเรียนรู้และร่วมงานกับทีม',
       list: [
-        'ทักษะ: Three.js · Blender · GLSL · HTML/CSS/JS',
-        'การศึกษา: วิทยาการคอมพิวเตอร์ ม.เกษตรศาสตร์',
-        'ภาษา: ไทย · English',
-        ['อีเมล: porwarit@ku.th', 'mailto:porwarit@ku.th'],
-        ['GitHub: porwaritb-cell', 'https://github.com/porwaritb-cell%20780645'],
+        'ภาษา: JavaScript · HTML · CSS',
+        'กราฟิก 3D: Three.js · GLSL Shader · Blender',
         'เครื่องมือ: VS Code · Git · GitHub',
-        'เก่งโค้ด: เขียนโปรแกรมแก้ปัญหาอย่างเป็นระบบ'
+        'จุดแข็ง: เก่งโค้ด วางโครงสร้างโปรแกรมให้เป็นระเบียบ',
+        ['อีเมล: porwarit@ku.th', 'mailto:porwarit@ku.th'],
+        ['GitHub: porwaritb-cell', 'https://github.com/porwaritb-cell%20780645']
       ],
-      tags: '', image: '', link: 'https://github.com/porwaritb-cell%20780645', linkText: 'Open GitHub ↗' }
+      tags: 'Available for internship · พร้อมฝึกงาน', image: '', link: 'mailto:porwarit@ku.th', linkText: 'Send email ✉' }
   ],
   slots: [ { title: 'Model Inspector', desc: 'นับเส้น จุด และสามเหลี่ยมของไฟล์ .glb — คลิกเพื่อเปิด', tools: 'Three.js · glTF', link: MODEL_PAGE, model: '', size: 0.9, crystal: 'gold' },
           { title: 'Green Crystal', desc: 'คริสตัลสีเขียวหกเหลี่ยม', tools: 'Three.js · PBR', link: '', model: '', size: 0.9, crystal: 'green' } ],
@@ -1614,16 +1614,27 @@ function openBoard(b) {
 
   const ul = $('bd-l');
   ul.replaceChildren();
-  (b.list || []).forEach(t => {
+  (b.list || []).forEach(item => {
+    const [text, href] = Array.isArray(item) ? item : [item, null];
+    const [label, ...rest] = text.split(': ');
     const li = document.createElement('li');
-    if (Array.isArray(t)) { // [text, url] becomes a link
+    if (rest.length) { // "label: value" shows the label in gold
+      const b = document.createElement('b');
+      b.textContent = label + ': ';
+      b.style.color = '#d8b46a';
+      li.appendChild(b);
+    }
+    const value = rest.length ? rest.join(': ') : text;
+    if (href) {
       const a = document.createElement('a');
-      a.textContent = t[0];
-      a.href = t[1];
+      a.textContent = value;
+      a.href = href;
       a.style.color = '#ffc2d9';
-      if (!t[1].startsWith('mailto:')) { a.target = '_blank'; a.rel = 'noopener'; }
+      if (!href.startsWith('mailto:')) { a.target = '_blank'; a.rel = 'noopener'; }
       li.appendChild(a);
-    } else li.textContent = t;
+    } else {
+      li.append(value);
+    }
     ul.appendChild(li);
   });
 
